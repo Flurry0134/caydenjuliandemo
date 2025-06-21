@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, ExportFormat } from '../../types';
-import { Send, Paperclip, ThumbsUp, ThumbsDown, Bot, User, Trash2 } from 'lucide-react';
+import { Send, Paperclip, ThumbsUp, ThumbsDown, Bot, User, Trash2, X } from 'lucide-react';
 import { useChats } from '../../hooks/useChats';
 import Header from '../Layout/Header';
 import FileUploadOverlay from '../Files/FileUploadOverlay';
@@ -14,8 +14,10 @@ const ChatInterface = () => {
   const [showUploadOverlay, setShowUploadOverlay] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messages = currentChat?.messages || [];
@@ -60,6 +62,7 @@ const ChatInterface = () => {
 
     addMessageToCurrentChat(userMessage);
     setInputText('');
+    setAttachedFiles([]); // Clear attached files after sending
     setIsTyping(true);
 
     // Simulate bot response
@@ -67,7 +70,7 @@ const ChatInterface = () => {
       const botContent = generateBotResponse(
         inputText, 
         currentChat.systemPrompt,
-        currentChat.files.length > 0
+        currentChat.files.length > 0 || attachedFiles.length > 0
       );
       
       const botResponse: Message = {
@@ -87,6 +90,27 @@ const ChatInterface = () => {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setAttachedFiles(prev => [...prev, ...files]);
+    }
+    // Reset the input value so the same file can be selected again
+    e.target.value = '';
+  };
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   const handleExport = (format: ExportFormat) => {
@@ -282,13 +306,51 @@ const ChatInterface = () => {
 
       {/* Input Area */}
       <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+        {/* Attached Files Display */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-4">
+            <div className="flex flex-wrap gap-2">
+              {attachedFiles.map((file, index) => (
+                <div
+                  key={index}
+                  className="inline-flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 rounded-lg text-sm border border-gray-200 dark:border-gray-600"
+                >
+                  <Paperclip className="w-3 h-3" />
+                  <span className="max-w-32 truncate">{file.name}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    ({formatFileSize(file.size)})
+                  </span>
+                  <button
+                    onClick={() => removeAttachedFile(index)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    title="Datei entfernen"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex items-end space-x-4">
-          <button
-            onClick={() => setShowUploadOverlay(true)}
-            className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              title="Datei anhängen"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="*/*"
+            />
+          </div>
           
           <div className="flex-1 relative">
             <textarea
