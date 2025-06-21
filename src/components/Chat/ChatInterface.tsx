@@ -289,22 +289,8 @@ const ChatInterface = () => {
                   </p>
                 </div>
                 
-                <div className="mt-2 flex items-center space-x-3">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {message.timestamp.toLocaleTimeString('de-DE')}
-                  </span>
-                  
-                  {message.sender === 'bot' && (
-                    <div className="flex items-center space-x-2">
-                      <button className="text-gray-400 hover:text-green-500 transition-colors">
-                        <ThumbsUp className="w-4 h-4" />
-                      </button>
-                      <button className="text-gray-400 hover:text-red-500 transition-colors">
-                        <ThumbsDown className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* --- KORREKTUR HIER: Der Block für Zeitstempel und Buttons wurde entfernt. --- */}
+
               </div>
             </div>
           </div>
