@@ -97,7 +97,6 @@ const ChatInterface = () => {
     if (files.length > 0) {
       setAttachedFiles(prev => [...prev, ...files]);
     }
-    // Reset the input value so the same file can be selected again
     e.target.value = '';
   };
 
@@ -115,13 +114,7 @@ const ChatInterface = () => {
 
   const handleExport = (format: ExportFormat) => {
     if (!currentChat) return;
-
-    const data = messages.map(msg => ({
-      sender: msg.sender,
-      content: msg.content,
-      timestamp: msg.timestamp.toISOString()
-    }));
-
+    const data = messages.map(msg => ({ sender: msg.sender, content: msg.content, timestamp: msg.timestamp.toISOString() }));
     let content = '';
     let mimeType = '';
     let filename = '';
@@ -133,9 +126,7 @@ const ChatInterface = () => {
         filename = 'chat-export.json';
         break;
       case 'txt':
-        content = data.map(msg => 
-          `[${msg.timestamp}] ${msg.sender === 'user' ? 'Sie' : 'Bot'}: ${msg.content}`
-        ).join('\n\n');
+        content = data.map(msg => `[${msg.timestamp}] ${msg.sender === 'user' ? 'Sie' : 'Bot'}: ${msg.content}`).join('\n\n');
         mimeType = 'text/plain';
         filename = 'chat-export.txt';
         break;
@@ -164,32 +155,19 @@ const ChatInterface = () => {
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-  
-    // Setze die Höhe zurück, um die tatsächliche Scroll-Höhe zu messen
     textarea.style.height = 'auto';
-    
-    // Verstecke die Scrollleiste während der Berechnung, um Messfehler zu vermeiden
     textarea.style.overflowY = 'hidden';
-  
     const style = window.getComputedStyle(textarea);
     const paddingTop = parseFloat(style.paddingTop);
     const paddingBottom = parseFloat(style.paddingBottom);
     const lineHeight = parseFloat(style.lineHeight);
-  
-    // Berechne die maximale Höhe für exakt 8 Zeilen
     const maxHeightFor8Lines = (8 * lineHeight) + paddingTop + paddingBottom;
-    
-    // Messe die Höhe des aktuellen Inhalts
     const currentScrollHeight = textarea.scrollHeight;
-  
-    // Wenn die aktuelle Höhe die 8-Zeilen-Grenze überschreitet:
+
     if (currentScrollHeight > maxHeightFor8Lines) {
-      // Setze die Höhe auf das 8-Zeilen-Maximum fest
       textarea.style.height = `${maxHeightFor8Lines}px`;
-      // Zeige die (gestylte) Scrollleiste an
       textarea.style.overflowY = 'auto';
     } else {
-      // Andernfalls lasse das Feld weiter mit dem Inhalt wachsen
       textarea.style.height = `${currentScrollHeight}px`;
     }
   };
@@ -218,7 +196,8 @@ const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+      {/* --- KORREKTUR 1 HIER: "border-b" wurde entfernt --- */}
+      <div className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -288,9 +267,6 @@ const ChatInterface = () => {
                     {message.content}
                   </p>
                 </div>
-                
-                {/* --- KORREKTUR HIER: Der Block für Zeitstempel und Buttons wurde entfernt. --- */}
-
               </div>
             </div>
           </div>
@@ -317,7 +293,8 @@ const ChatInterface = () => {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+      {/* --- KORREKTUR 2 HIER: "border-t" wurde entfernt --- */}
+      <div className="border-gray-200 dark:border-gray-700 p-6">
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
           <div className="mb-4">
