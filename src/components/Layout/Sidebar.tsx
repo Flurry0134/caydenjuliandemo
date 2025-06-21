@@ -28,7 +28,7 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
           </div>
           <div>
             <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-              KI-Chatbot
+              KI-Assistent
             </h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               v1.0.0
