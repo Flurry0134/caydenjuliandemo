@@ -53,8 +53,13 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
 
   // Save chats to localStorage whenever chats change
   useEffect(() => {
+    // --- KORREKTUR 1: Sicherstellen, dass localStorage geleert wird, wenn alle Chats gelöscht sind ---
     if (chats.length > 0) {
       localStorage.setItem('chatbot-chats', JSON.stringify(chats));
+    } else {
+      // Wenn keine Chats mehr da sind, auch den Speicher leeren
+      localStorage.removeItem('chatbot-chats');
+      localStorage.removeItem('chatbot-current-chat-id');
     }
   }, [chats]);
 
@@ -62,6 +67,9 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (currentChatId) {
       localStorage.setItem('chatbot-current-chat-id', currentChatId);
+    } else {
+      // Wenn kein Chat ausgewählt ist, auch den Speicher leeren
+      localStorage.removeItem('chatbot-current-chat-id');
     }
   }, [currentChatId]);
 
@@ -114,18 +122,19 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     setCurrentChatId(chatId);
   };
 
+  // --- KORREKTUR 2: Die deleteChat-Funktion wie von Ihnen beschrieben angepasst ---
   const deleteChat = (chatId: string) => {
     setChats(prev => {
       const updatedChats = prev.filter(chat => chat.id !== chatId);
       
-      // If we're deleting the current chat, select another one or create new
+      // Wenn der aktuell ausgewählte Chat gelöscht wird...
       if (currentChatId === chatId) {
         if (updatedChats.length > 0) {
+          // ...wähle den ersten verbleibenden Chat aus.
           setCurrentChatId(updatedChats[0].id);
         } else {
-          // Create a new chat if no chats remain
-          const newChatId = createNewChat();
-          return prev; // Return original since createNewChat will update the state
+          // ...oder setze die Auswahl auf null, wenn keine Chats mehr übrig sind.
+          setCurrentChatId(null);
         }
       }
       
