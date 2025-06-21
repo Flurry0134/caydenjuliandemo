@@ -196,7 +196,6 @@ const ChatInterface = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* --- KORREKTUR 1 HIER: "border-b" wurde entfernt --- */}
       <div className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -238,7 +237,8 @@ const ChatInterface = () => {
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* --- KORREKTUR HIER: "custom-scrollbar" hinzugefügt --- */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -293,7 +293,6 @@ const ChatInterface = () => {
       </div>
 
       {/* Input Area */}
-      {/* --- KORREKTUR 2 HIER: "border-t" wurde entfernt --- */}
       <div className="border-gray-200 dark:border-gray-700 p-6">
         {/* Attached Files Display */}
         {attachedFiles.length > 0 && (
