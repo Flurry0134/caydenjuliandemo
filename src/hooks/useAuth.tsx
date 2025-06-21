@@ -23,30 +23,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulate API call with test credentials
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    if (email === 'cay1768@gmail.com' && password === 'aceA47cs') {
-      const userData: User = {
-        id: '1',
-        email,
-        name: 'Admin User',
-        role: 'admin',
-        lastLogin: new Date()
-      };
-      
-      setUser(userData);
-      localStorage.setItem('chatbot-user', JSON.stringify(userData));
-      setIsLoading(false);
-      return true;
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+                const userData: User = {
+                    id: data.user.id.toString(),
+                    email: data.user.email,
+                    name: data.user.name,
+                    role: data.user.role,
+                    lastLogin: new Date(data.user.lastLogin)
+                };
+                setUser(userData);
+                localStorage.setItem('chatbot-user', JSON.stringify(userData));
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Login error:', error);
+        return false;
+    } finally {
+        setIsLoading(false);
     }
-    
-    setIsLoading(false);
-    return false;
-  };
+};
 
   const logout = () => {
     setUser(null);
