@@ -162,9 +162,35 @@ const ChatInterface = () => {
   };
 
   const adjustTextareaHeight = () => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+  
+    // Setze die Höhe zurück, um die tatsächliche Scroll-Höhe zu messen
+    textarea.style.height = 'auto';
+    
+    // Verstecke die Scrollleiste während der Berechnung, um Messfehler zu vermeiden
+    textarea.style.overflowY = 'hidden';
+  
+    const style = window.getComputedStyle(textarea);
+    const paddingTop = parseFloat(style.paddingTop);
+    const paddingBottom = parseFloat(style.paddingBottom);
+    const lineHeight = parseFloat(style.lineHeight);
+  
+    // Berechne die maximale Höhe für exakt 8 Zeilen
+    const maxHeightFor8Lines = (8 * lineHeight) + paddingTop + paddingBottom;
+    
+    // Messe die Höhe des aktuellen Inhalts
+    const currentScrollHeight = textarea.scrollHeight;
+  
+    // Wenn die aktuelle Höhe die 8-Zeilen-Grenze überschreitet:
+    if (currentScrollHeight > maxHeightFor8Lines) {
+      // Setze die Höhe auf das 8-Zeilen-Maximum fest
+      textarea.style.height = `${maxHeightFor8Lines}px`;
+      // Zeige die (gestylte) Scrollleiste an
+      textarea.style.overflowY = 'auto';
+    } else {
+      // Andernfalls lasse das Feld weiter mit dem Inhalt wachsen
+      textarea.style.height = `${currentScrollHeight}px`;
     }
   };
 
