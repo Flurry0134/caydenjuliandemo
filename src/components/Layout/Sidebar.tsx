@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { Bot, FileText, Settings, Moon, Sun, LogOut, Menu, X } from 'lucide-react';
-// GELÖSCHT: "Language" wurde aus den Imports entfernt, da es nicht mehr benötigt wird.
 import ChatList from '../Chat/ChatList';
 
 interface SidebarProps {
@@ -14,24 +13,11 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
   const { user, logout } = useAuth();
   const { isDark, toggle } = useDarkMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  // GELÖSCHT: Der "language" State wurde entfernt.
-  // const [language, setLanguage] = useState<Language>('de');
 
   const menuItems = [
     { id: 'files', label: 'Dateien', icon: FileText },
     ...(user?.role === 'admin' ? [{ id: 'settings', label: 'Einstellungen', icon: Settings }] : [])
   ];
-
-  // GELÖSCHT: Die Funktionen "toggleLanguage" und "getLanguageFlag" wurden entfernt.
-  /*
-  const toggleLanguage = () => {
-    setLanguage(prev => prev === 'de' ? 'en' : 'de');
-  };
-
-  const getLanguageFlag = () => {
-    return language === 'de' ? '🇩🇪' : '🇺🇸';
-  };
-  */
 
   const SidebarContent = () => (
     <>
@@ -102,8 +88,6 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
-            {/* GELÖSCHT: Der Button für die Sprachumschaltung wurde hier entfernt. */}
-            
             {/* Dark Mode Toggle */}
             <button
               onClick={toggle}
@@ -146,13 +130,15 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
       )}
 
       {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-col">
+      {/* --- KORREKTUR 1 HIER: h-screen hinzugefügt --- */}
+      <div className="hidden md:flex w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-col h-screen">
         <SidebarContent />
       </div>
 
       {/* Mobile Sidebar */}
+      {/* --- KORREKTUR 2 HIER: h-full zu h-screen geändert für Konsistenz --- */}
       <div
-        className={`md:hidden fixed left-0 top-0 h-full w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transform transition-transform duration-300 z-50 ${
+        className={`md:hidden fixed left-0 top-0 h-screen w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transform transition-transform duration-300 z-50 ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
