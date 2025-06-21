@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { Bot, FileText, Settings, Moon, Sun, LogOut, Menu, X } from 'lucide-react';
-import { Language } from '../../types';
+// GELÖSCHT: "Language" wurde aus den Imports entfernt, da es nicht mehr benötigt wird.
 import ChatList from '../Chat/ChatList';
 
 interface SidebarProps {
@@ -14,13 +14,16 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
   const { user, logout } = useAuth();
   const { isDark, toggle } = useDarkMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [language, setLanguage] = useState<Language>('de');
+  // GELÖSCHT: Der "language" State wurde entfernt.
+  // const [language, setLanguage] = useState<Language>('de');
 
   const menuItems = [
     { id: 'files', label: 'Dateien', icon: FileText },
     ...(user?.role === 'admin' ? [{ id: 'settings', label: 'Einstellungen', icon: Settings }] : [])
   ];
 
+  // GELÖSCHT: Die Funktionen "toggleLanguage" und "getLanguageFlag" wurden entfernt.
+  /*
   const toggleLanguage = () => {
     setLanguage(prev => prev === 'de' ? 'en' : 'de');
   };
@@ -28,6 +31,7 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
   const getLanguageFlag = () => {
     return language === 'de' ? '🇩🇪' : '🇺🇸';
   };
+  */
 
   const SidebarContent = () => (
     <>
@@ -97,16 +101,8 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
       {/* Bottom Controls */}
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-3">
-          {/* Language and Dark Mode Toggle Icons */}
           <div className="flex items-center space-x-2">
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLanguage}
-              className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200 text-lg"
-              title={`Switch to ${language === 'de' ? 'English' : 'Deutsch'}`}
-            >
-              {getLanguageFlag()}
-            </button>
+            {/* GELÖSCHT: Der Button für die Sprachumschaltung wurde hier entfernt. */}
             
             {/* Dark Mode Toggle */}
             <button
