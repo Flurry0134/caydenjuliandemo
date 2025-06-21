@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, Language, ExportFormat } from '../../types';
+import { Message, ExportFormat } from '../../types';
 import { Send, Paperclip, ThumbsUp, ThumbsDown, Bot, User, Trash2 } from 'lucide-react';
 import { useChats } from '../../hooks/useChats';
 import Header from '../Layout/Header';
@@ -10,7 +10,6 @@ import ChatSettings from './ChatSettings';
 const ChatInterface = () => {
   const { currentChat, addMessageToCurrentChat, deleteChat } = useChats();
   const [inputText, setInputText] = useState('');
-  const [language, setLanguage] = useState<Language>('de');
   const [isTyping, setIsTyping] = useState(false);
   const [showUploadOverlay, setShowUploadOverlay] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -186,8 +185,6 @@ const ChatInterface = () => {
           </div>
           
           <Header
-            language={language}
-            setLanguage={setLanguage}
             onExport={handleExport}
             onOpenSettings={() => setShowSettings(true)}
           />
@@ -244,7 +241,7 @@ const ChatInterface = () => {
                 
                 <div className="mt-2 flex items-center space-x-3">
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {message.timestamp.toLocaleTimeString(language === 'de' ? 'de-DE' : 'en-US')}
+                    {message.timestamp.toLocaleTimeString('de-DE')}
                   </span>
                   
                   {message.sender === 'bot' && (
@@ -299,7 +296,7 @@ const ChatInterface = () => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={language === 'de' ? 'Nachricht eingeben...' : 'Type your message...'}
+              placeholder="Nachricht eingeben..."
               className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none min-h-[48px] max-h-40 transition-all duration-200"
               rows={1}
             />
@@ -315,10 +312,7 @@ const ChatInterface = () => {
         </div>
         
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-          {language === 'de' 
-            ? 'Drücken Sie Enter zum Senden, Shift + Enter für eine neue Zeile'
-            : 'Press Enter to send, Shift + Enter for new line'
-          }
+          Drücken Sie Enter zum Senden, Shift + Enter für eine neue Zeile
         </p>
       </div>
 

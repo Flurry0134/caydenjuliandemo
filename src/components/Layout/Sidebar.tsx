@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDarkMode } from '../../hooks/useDarkMode';
 import { Bot, FileText, Settings, Moon, Sun, LogOut, Menu, X } from 'lucide-react';
+import { Language } from '../../types';
 import ChatList from '../Chat/ChatList';
 
 interface SidebarProps {
@@ -13,11 +14,20 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
   const { user, logout } = useAuth();
   const { isDark, toggle } = useDarkMode();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [language, setLanguage] = useState<Language>('de');
 
   const menuItems = [
     { id: 'files', label: 'Dateien', icon: FileText },
     ...(user?.role === 'admin' ? [{ id: 'settings', label: 'Einstellungen', icon: Settings }] : [])
   ];
+
+  const toggleLanguage = () => {
+    setLanguage(prev => prev === 'de' ? 'en' : 'de');
+  };
+
+  const getLanguageFlag = () => {
+    return language === 'de' ? '🇩🇪' : '🇺🇸';
+  };
 
   const SidebarContent = () => (
     <>
@@ -84,20 +94,32 @@ const Sidebar = ({ currentPage, setCurrentPage }: SidebarProps) => {
         </nav>
       )}
 
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-        <div className="relative group">
-          <button
-            onClick={toggle}
-            className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200"
-          >
-            {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            <span className="font-medium">Toggle Dark Mode</span>
-          </button>
-          <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-            Zwischen hellem und dunklem Modus wechseln
+      {/* Bottom Controls */}
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-3">
+          {/* Language and Dark Mode Toggle Icons */}
+          <div className="flex items-center space-x-2">
+            {/* Language Toggle */}
+            <button
+              onClick={toggleLanguage}
+              className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200 text-lg"
+              title={`Switch to ${language === 'de' ? 'English' : 'Deutsch'}`}
+            >
+              {getLanguageFlag()}
+            </button>
+            
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggle}
+              className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-all duration-200"
+              title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
           </div>
         </div>
         
+        {/* Logout Button */}
         <button
           onClick={logout}
           className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
