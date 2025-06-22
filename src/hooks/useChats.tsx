@@ -1,5 +1,5 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { Chat, Message, ChatFile } from '../types';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
+import { Chat, Message, ChatFile } from '../types'; // Stelle sicher, dass diese Typen korrekt definiert sind
 
 interface ChatsContextType {
   chats: Chat[];
@@ -8,74 +8,94 @@ interface ChatsContextType {
   createNewChat: () => Promise<string>;
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => Promise<void>;
-  addMessageToCurrentChat: (message: Message) => Promise<void>;
+  addMessageToCurrentChat: (message: Message) => void; // For immediate UI update of user message
   updateChatTitle: (chatId: string, title: string) => Promise<void>;
   updateChatSystemPrompt: (chatId: string, systemPrompt: string) => Promise<void>;
-  addFilesToCurrentChat: (files: File[]) => Promise<void>;
+  addFilesToCurrentChat: (files: File[]) => Promise<void>; // Accepts File[] for upload
   removeFileFromCurrentChat: (fileId: string) => Promise<void>;
-  sendMessage: (message: string) => Promise<string>;
+  sendMessage: (messageContent: string) => Promise<string>; // Sends message to LLM, gets response
   isLoading: boolean;
 }
 
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
 
-// Configuration - UPDATED WITH NGROK URL
+// Configuration - WICHTIG: Ersetze dies mit deiner aktuellen ngrok-URL oder der finalen Backend-URL
 const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app';
 
 export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For LLM response loading
 
-  // Get current user from localStorage
-  const getCurrentUser = () => {
+  // Helper to get current user from localStorage (used for API calls)
+  const getCurrentUser = useCallback(() => {
     const savedUser = localStorage.getItem('chatbot-user');
     return savedUser ? JSON.parse(savedUser) : null;
-  };
+  }, []);
 
-  // Load chats from API
-  const loadChats = async () => {
+  // --- API Loading Functions ---
+
+  // Loads chat list from API
+  const loadChats = useCallback(async () => {
     const user = getCurrentUser();
-    if (!user) return;
+    if (!user) {
+      setChats([]); // Clear chats if no user
+      setCurrentChatId(null);
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/chats?user_id=${user.id}`);
       if (response.ok) {
         const chatsData = await response.json();
-        const formattedChats = chatsData.map((chat: any) => ({
+        const formattedChats: Chat[] = chatsData.map((chat: any) => ({
           id: chat.id.toString(),
           title: chat.title,
           createdAt: new Date(chat.created_at),
-          updatedAt: new Date(chat.created_at), // API doesn't return updatedAt yet
-          systemPrompt: chat.system_prompt,
-          messages: [],
-          files: []
+          updatedAt: new Date(chat.updated_at || chat.created_at), // Use updated_at if available
+          systemPrompt: chat.system_prompt || '',
+          messages: [], // Messages will be loaded separately
+          files: [],    // Files will be loaded separately
+          preview: chat.preview || '', // Assuming backend might provide a preview
         }));
         setChats(formattedChats);
-        
-        // Set current chat if none selected
-        if (!currentChatId && formattedChats.length > 0) {
+
+        // Try to restore current chat from localStorage, or select first if available
+        const savedCurrentChatId = localStorage.getItem('chatbot-current-chat-id');
+        if (savedCurrentChatId && formattedChats.some(chat => chat.id === savedCurrentChatId)) {
+          setCurrentChatId(savedCurrentChatId);
+        } else if (formattedChats.length > 0) {
           setCurrentChatId(formattedChats[0].id);
+        } else {
+          // If no chats, create a new one
+          const newChatId = await createNewChat();
+          setCurrentChatId(newChatId);
         }
+      } else {
+        console.error('Failed to load chats:', response.statusText);
+        setChats([]);
+        setCurrentChatId(null);
       }
     } catch (error) {
       console.error('Error loading chats:', error);
+      setChats([]);
+      setCurrentChatId(null);
     }
-  };
+  }, [getCurrentUser]); // Added getCurrentUser to dependencies
 
-  // Load messages for a specific chat
-  const loadMessages = async (chatId: string) => {
+  // Loads messages for a specific chat from API
+  const loadMessages = useCallback(async (chatId: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/messages`);
       if (response.ok) {
         const messagesData = await response.json();
-        const formattedMessages = messagesData.map((msg: any) => ({
+        const formattedMessages: Message[] = messagesData.map((msg: any) => ({
           id: msg.id.toString(),
-          role: msg.role,
+          role: msg.role, // 'user' or 'assistant' (or 'bot' from old code)
           content: msg.content,
-          timeStamp: new Date(msg.created_at)
+          timeStamp: new Date(msg.created_at) // Standardize on timeStamp
         }));
-        
+
         setChats(prevChats =>
           prevChats.map(chat =>
             chat.id === chatId
@@ -83,25 +103,27 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
               : chat
           )
         );
+      } else {
+        console.error(`Failed to load messages for chat ${chatId}:`, response.statusText);
       }
     } catch (error) {
-      console.error('Error loading messages:', error);
+      console.error(`Error loading messages for chat ${chatId}:`, error);
     }
-  };
+  }, []);
 
-  // Load documents for a specific chat
-  const loadDocuments = async (chatId: string) => {
+  // Loads documents (files) for a specific chat from API
+  const loadDocuments = useCallback(async (chatId: string) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/documents`);
       if (response.ok) {
         const documentsData = await response.json();
-        const formattedFiles = documentsData.map((doc: any) => ({
+        const formattedFiles: ChatFile[] = documentsData.map((doc: any) => ({
           id: doc.id.toString(),
           name: doc.filename,
           size: doc.filesize,
-          type: doc.filename.split('.').pop() || 'unknown'
+          type: doc.filename.split('.').pop() || 'unknown' // Extract type from filename
         }));
-        
+
         setChats(prevChats =>
           prevChats.map(chat =>
             chat.id === chatId
@@ -109,24 +131,33 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
               : chat
           )
         );
+      } else {
+        console.error(`Failed to load documents for chat ${chatId}:`, response.statusText);
       }
     } catch (error) {
-      console.error('Error loading documents:', error);
+      console.error(`Error loading documents for chat ${chatId}:`, error);
     }
-  };
+  }, []);
 
-  // Load chats on mount
+  // --- useEffect Hooks ---
+
+  // Initial load of chats on component mount
   useEffect(() => {
     loadChats();
-  }, []);
+  }, [loadChats]);
 
   // Load messages and documents when current chat changes
   useEffect(() => {
     if (currentChatId) {
       loadMessages(currentChatId);
       loadDocuments(currentChatId);
+      localStorage.setItem('chatbot-current-chat-id', currentChatId); // Persist current chat ID
+    } else {
+      localStorage.removeItem('chatbot-current-chat-id');
     }
-  }, [currentChatId]);
+  }, [currentChatId, loadMessages, loadDocuments]);
+
+  // --- Chat Management Functions ---
 
   const createNewChat = async (): Promise<string> => {
     const user = getCurrentUser();
@@ -139,28 +170,29 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: 'Neuer Chat',
+          title: 'Neuer Chat', // Default title
           user_id: parseInt(user.id)
         }),
       });
 
       if (response.ok) {
-        const newChat = await response.json();
-        const formattedChat = {
-          id: newChat.id.toString(),
-          title: newChat.title,
-          createdAt: new Date(newChat.created_at),
-          updatedAt: new Date(newChat.created_at),
-          systemPrompt: newChat.system_prompt,
+        const newChatData = await response.json();
+        const newChat: Chat = {
+          id: newChatData.id.toString(),
+          title: newChatData.title,
+          createdAt: new Date(newChatData.created_at),
+          updatedAt: new Date(newChatData.updated_at || newChatData.created_at),
+          systemPrompt: newChatData.system_prompt || '',
           messages: [],
-          files: []
+          files: [],
+          preview: newChatData.preview || '',
         };
-        
-        setChats(prevChats => [formattedChat, ...prevChats]);
-        setCurrentChatId(formattedChat.id);
-        return formattedChat.id;
+
+        setChats(prevChats => [newChat, ...prevChats]);
+        setCurrentChatId(newChat.id);
+        return newChat.id;
       }
-      throw new Error('Failed to create chat');
+      throw new Error('Failed to create chat on backend');
     } catch (error) {
       console.error('Error creating chat:', error);
       throw error;
@@ -178,10 +210,21 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
       });
 
       if (response.ok) {
-        setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
-        if (currentChatId === chatId) {
-          setCurrentChatId(null);
-        }
+        setChats(prevChats => {
+          const updatedChats = prevChats.filter(chat => chat.id !== chatId);
+
+          // Logic from old code: select new current chat if deleted one was active
+          if (currentChatId === chatId) {
+            if (updatedChats.length > 0) {
+              setCurrentChatId(updatedChats[0].id);
+            } else {
+              setCurrentChatId(null);
+            }
+          }
+          return updatedChats;
+        });
+      } else {
+        console.error(`Failed to delete chat ${chatId}:`, response.statusText);
       }
     } catch (error) {
       console.error('Error deleting chat:', error);
@@ -189,29 +232,37 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
     }
   };
 
-  const addMessageToCurrentChat = async (message: Message) => {
+  // This function is for immediate UI update of the user's message
+  const addMessageToCurrentChat = (message: Message) => {
     if (!currentChatId) return;
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/chats/${currentChatId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          role: message.role,
-          content: message.content,
-        }),
-      });
+    setChats(prev => prev.map(chat => {
+      if (chat.id === currentChatId) {
+        // Prevent duplicate if message already exists (e.g., after API sync)
+        if (chat.messages.some(msg => msg.id === message.id)) {
+          return chat;
+        }
+        const updatedMessages = [...chat.messages, message];
+        const preview = message.role === 'user'
+          ? message.content.substring(0, 50) + (message.content.length > 50 ? '...' : '')
+          : chat.preview;
 
-      if (response.ok) {
-        // Reload messages to get the updated list
-        await loadMessages(currentChatId);
+        // Auto-generate title from first user message if still default
+        let title = chat.title;
+        if (title === 'Neuer Chat' && message.role === 'user') {
+          title = message.content.substring(0, 30) + (message.content.length > 30 ? '...' : '');
+        }
+
+        return {
+          ...chat,
+          title,
+          messages: updatedMessages,
+          updatedAt: new Date(),
+          preview
+        };
       }
-    } catch (error) {
-      console.error('Error adding message:', error);
-      throw error;
-    }
+      return chat;
+    }));
   };
 
   const updateChatTitle = async (chatId: string, title: string) => {
@@ -232,6 +283,8 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
               : chat
           )
         );
+      } else {
+        console.error(`Failed to update chat title for ${chatId}:`, response.statusText);
       }
     } catch (error) {
       console.error('Error updating chat title:', error);
@@ -257,6 +310,8 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
               : chat
           )
         );
+      } else {
+        console.error(`Failed to update system prompt for ${chatId}:`, response.statusText);
       }
     } catch (error) {
       console.error('Error updating system prompt:', error);
@@ -265,7 +320,7 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   };
 
   const addFilesToCurrentChat = async (files: File[]) => {
-    if (!currentChatId) return;
+    if (!currentChatId) throw new Error('No chat selected to add files to.');
 
     try {
       for (const file of files) {
@@ -278,12 +333,11 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
         });
 
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.detail || 'Failed to upload file');
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Failed to upload file: ${file.name}`);
         }
       }
-      
-      // Reload documents after upload
+      // Reload documents after all uploads are complete
       await loadDocuments(currentChatId);
     } catch (error) {
       console.error('Error uploading files:', error);
@@ -292,13 +346,18 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   };
 
   const removeFileFromCurrentChat = async (fileId: string) => {
+    if (!currentChatId) return; // Should not happen if a file is selected
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/documents/${fileId}`, {
         method: 'DELETE',
       });
 
-      if (response.ok && currentChatId) {
+      if (response.ok) {
+        // Reload documents to reflect changes from backend
         await loadDocuments(currentChatId);
+      } else {
+        console.error(`Failed to remove file ${fileId}:`, response.statusText);
       }
     } catch (error) {
       console.error('Error removing file:', error);
@@ -306,31 +365,41 @@ export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
     }
   };
 
-  const sendMessage = async (message: string): Promise<string> => {
-    if (!currentChatId) throw new Error('No chat selected');
+  const sendMessage = async (messageContent: string): Promise<string> => {
+    if (!currentChatId) throw new Error('No chat selected to send message');
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat/completion`, {
+      // First, send the user's message to the backend to be stored
+      const userMessageResponse = await fetch(`${API_BASE_URL}/api/chats/${currentChatId}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: messageContent }),
+      });
+
+      if (!userMessageResponse.ok) {
+        throw new Error('Failed to save user message to backend');
+      }
+
+      // Then, request completion from the LLM
+      const completionResponse = await fetch(`${API_BASE_URL}/api/chat/completion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message,
+          message: messageContent,
           chat_id: parseInt(currentChatId),
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        // Reload messages to get the updated conversation
+      if (completionResponse.ok) {
+        const data = await completionResponse.json();
+        // Reload all messages for the current chat to include both user's and AI's response
         await loadMessages(currentChatId);
-        return data.response;
+        return data.response; // Return AI's response content
       }
-      throw new Error('Failed to send message');
+      throw new Error('Failed to get AI completion');
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error sending message or getting completion:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -369,4 +438,3 @@ export const useChats = () => {
   }
   return context;
 };
-
