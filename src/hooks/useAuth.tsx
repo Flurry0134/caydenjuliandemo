@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User } from '../types';
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
@@ -10,7 +10,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+// Configuration - Update this URL to your backend API
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+export const AuthProvider = ({ children }: { children: ReactNode } ) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -23,39 +26,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(false);
   }, []);
 
-const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-        });
 
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-                const userData: User = {
-                    id: data.user.id.toString(),
-                    email: data.user.email,
-                    name: data.user.name,
-                    role: data.user.role,
-                    lastLogin: new Date(data.user.lastLogin)
-                };
-                setUser(userData);
-                localStorage.setItem('chatbot-user', JSON.stringify(userData));
-                return true;
-            }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const userData: User = {
+            id: data.user.id.toString(),
+            email: data.user.email,
+            name: data.user.name,
+            role: data.user.role,
+            lastLogin: new Date(data.user.lastLogin)
+          };
+          setUser(userData);
+          localStorage.setItem('chatbot-user', JSON.stringify(userData));
+          setIsLoading(false);
+          return true;
         }
-        return false;
+      }
+      
+      setIsLoading(false);
+      return false;
     } catch (error) {
-        console.error('Login error:', error);
-        return false;
-    } finally {
-        setIsLoading(false);
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return false;
     }
-};
+  };
 
   const logout = () => {
     setUser(null);
