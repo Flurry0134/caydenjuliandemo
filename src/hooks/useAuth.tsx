@@ -1,16 +1,16 @@
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 
-// Annahme der User-Typ-Definition basierend auf deinem Code
-// Falls du eine zentrale 'types.ts' Datei hast, importiere es von dort.
+// Annahme der User-Typ-Definition basierend auf deinem alten Code
+// Dies ist das gewünschte Interface für das Frontend
 interface User {
-  id: string; // Die Backend-ID wird hier als String gespeichert
+  id: string;
   email: string;
   name: string;
-  role: string;
+  role: string; // z.B. 'admin', 'user'
   lastLogin: Date;
 }
 
-// Definiert die Struktur des Auth-Kontexts, der für die App bereitgestellt wird
+// Definiert die Struktur des Auth-Kontexts, wie im alten Code gewünscht
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
@@ -20,39 +20,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Die URL deines Backend-Servers (ngrok oder localhost)
-// Es ist eine gute Praxis, dies an einer zentralen Stelle zu definieren.
-const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app'; // WICHTIG: Ersetze dies mit deiner aktuellen ngrok-URL
+// Die URL deines Backend-Servers
+// WICHTIG: Ersetze dies mit deiner aktuellen ngrok-URL oder der finalen Backend-URL
+const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app'; 
 
-/**
- * Der AuthProvider ist eine Komponente, die die gesamte App umschließt
- * und den Authentifizierungs-Status (wer ist eingeloggt?) verwaltet.
- */
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode } ) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Dieser Effekt läuft nur einmal beim ersten Laden der App.
-  // Er prüft, ob bereits ein Nutzer im lokalen Speicher des Browsers gespeichert ist.
+  // Dieser Effekt prüft beim Laden der App, ob bereits ein Nutzer im lokalen Speicher ist.
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('chatbot-user');
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
-        // Wir müssen sicherstellen, dass das Datum wieder ein echtes Datumsobjekt ist
+        // Stelle sicher, dass lastLogin wieder ein Date-Objekt ist
         parsedUser.lastLogin = new Date(parsedUser.lastLogin);
         setUser(parsedUser);
       }
     } catch (error) {
-        console.error("Fehler beim Wiederherstellen der User-Session:", error);
-        localStorage.removeItem('chatbot-user');
+      console.error("Fehler beim Wiederherstellen der User-Session:", error);
+      localStorage.removeItem('chatbot-user'); // Lösche ungültige Daten
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  /**
-   * Die Login-Funktion. Sie sendet die Anmeldedaten an das Backend.
-   */
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
@@ -67,12 +60,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          // Konvertiere die Backend-Antwort in unser Frontend-User-Format
+          // Mapping der Backend-Antwort auf das gewünschte Frontend-User-Interface
           const userData: User = {
-            id: data.user.id.toString(), // ID wird als String gespeichert
+            id: data.user.id.toString(), // Backend-ID als String speichern
             email: data.user.email,
             name: data.user.name,
-            role: "admin", // Annahme basierend auf dem alten Code
+            role: data.user.role || 'user', // Nutze die Rolle vom Backend, falls vorhanden, sonst 'user'
             lastLogin: new Date(data.user.lastLogin)
           };
           
@@ -92,16 +85,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  /**
-   * Die Logout-Funktion. Sie entfernt den Nutzer aus dem Zustand und dem Speicher.
-   */
   const logout = () => {
     setUser(null);
     localStorage.removeItem('chatbot-user');
-    // Hier könnte man auch einen API-Call zum Backend für den Logout machen, falls nötig
+    // Optional: Hier könnte ein API-Call zum Backend für den Logout erfolgen, falls nötig
   };
 
-  // Stellt den Zustand und die Funktionen für alle untergeordneten Komponenten bereit
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
@@ -109,10 +98,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * Ein benutzerdefinierter Hook, um den Auth-Kontext einfacher zu verwenden.
- * Statt `useContext(AuthContext)` schreibt man einfach `useAuth()`.
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
