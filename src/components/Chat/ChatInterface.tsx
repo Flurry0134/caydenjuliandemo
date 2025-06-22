@@ -273,9 +273,7 @@ const ChatInterface: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                  </span>
+                  <span className="text-sm">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
                 </div>
                 <button
                   onClick={() => removeFileFromCurrentChat(file.id)}
