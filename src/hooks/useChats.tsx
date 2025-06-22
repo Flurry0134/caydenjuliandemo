@@ -19,8 +19,8 @@ interface ChatsContextType {
 
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
 
-// Configuration - Update this URL to your backend API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Configuration - UPDATED WITH NGROK URL
+const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app';
 
 export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -369,3 +369,4 @@ export const useChats = () => {
   }
   return context;
 };
+
