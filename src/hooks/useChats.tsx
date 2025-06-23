@@ -16,10 +16,13 @@ interface ChatsContextType {
   updateChatSystemPrompt: (chatId: string, systemPrompt: string) => Promise<void>;
   addFilesToCurrentChat: (files: File[]) => Promise<void>;
   removeFileFromCurrentChat: (fileId: string) => Promise<void>;
+  addMessageToCurrentChat: (message: Message) => void;
 }
 
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
-const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app'; // WICHTIG: Deine ngrok-URL
+
+// API URL auf ngrok geändert
+const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app';
 
 export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
@@ -34,9 +37,12 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
       const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/chats`);
       if (response.ok) {
         const chatsData: any[] = await response.json();
-        const formattedChats = chatsData.map(c => ({...c, id: c.id.toString(), messages:[], files: []}));
+        const formattedChats = chatsData.map(c => ({...c, id: c.id.toString(), messages:[], files: [], systemPrompt: c.system_prompt || ''}));
         setChats(formattedChats);
-        if (formattedChats.length > 0 && !formattedChats.some(c => c.id === currentChatId)) {
+        const savedCurrentChatId = localStorage.getItem('chatbot-current-chat-id');
+        if (savedCurrentChatId && formattedChats.some(c => c.id === savedCurrentChatId)) {
+          setCurrentChatId(savedCurrentChatId);
+        } else if (formattedChats.length > 0) {
           setCurrentChatId(formattedChats[0].id);
         }
       }
@@ -59,8 +65,10 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (currentChatId) {
       fetchMessages(currentChatId);
+      localStorage.setItem('chatbot-current-chat-id', currentChatId);
     } else {
       setMessages([]);
+      localStorage.removeItem('chatbot-current-chat-id');
     }
   }, [currentChatId]);
 
@@ -94,13 +102,16 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) { console.error("Fehler beim Löschen des Chats:", e); }
   };
 
+  const addMessageToCurrentChat = (message: Message) => {
+    if (!currentChatId) return;
+    // Diese Funktion wird vom sendMessage-Hook für das optimistische UI-Update verwendet.
+    setMessages(prev => [...prev, message]);
+  };
+  
   const sendMessage = async (messageContent: string) => {
     if (!currentChatId) return;
     setIsLoading(true);
-    
-    // Die 'optimistische' Nachricht, die sofort angezeigt wird
-    const tempUserMessage = { id: `temp_${Date.now()}`, content: messageContent, sender: 'user', timeStamp: new Date() };
-    setMessages(prev => [...prev, tempUserMessage]);
+    addMessageToCurrentChat({ id: `temp-${Date.now()}`, content: messageContent, sender: 'user', timeStamp: new Date() });
     
     try {
       await fetch(`${API_BASE_URL}/api/chat/completion`, {
@@ -108,30 +119,29 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: parseInt(currentChatId), message: messageContent }),
       });
-      // Nachdem die KI geantwortet und alles gespeichert hat, laden wir den Chatverlauf neu
       await fetchMessages(currentChatId);
     } catch (e) {
       console.error("Fehler beim Senden der Nachricht:", e);
-      // Ersetze die temporäre Nachricht durch eine Fehlermeldung
-      const errorMessage = { id: `error_${Date.now()}`, content: "Fehler: Antwort konnte nicht empfangen werden.", sender: 'bot', timeStamp: new Date() };
-      setMessages(prev => [...prev.filter(m => m.id !== tempUserMessage.id), errorMessage]);
+      addMessageToCurrentChat({ id: `error-${Date.now()}`, content: "Fehler: Antwort konnte nicht empfangen werden.", sender: 'bot', timeStamp: new Date() });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateChatTitle = async (chatId: string, title: string) => { /* Hier API Call einfügen */ };
-  const updateChatSystemPrompt = async (chatId: string, systemPrompt: string) => { /* Hier API Call einfügen */ };
-  const addFilesToCurrentChat = async (files: File[]) => { /* Hier API Call einfügen */ };
-  const removeFileFromCurrentChat = async (fileId: string) => { /* Hier API Call einfügen */ };
+  // Implementierung der verbleibenden Funktionen (Platzhalter, da Backend-Endpunkte fehlen)
+  const updateChatTitle = async (chatId: string, title: string) => { console.log("updateChatTitle", chatId, title); };
+  const updateChatSystemPrompt = async (chatId: string, systemPrompt: string) => { console.log("updateChatSystemPrompt", chatId, systemPrompt); };
+  const addFilesToCurrentChat = async (files: File[]) => { console.log("addFilesToCurrentChat", files); };
+  const removeFileFromCurrentChat = async (fileId: string) => { console.log("removeFileFromCurrentChat", fileId); };
 
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
   return (
     <ChatsContext.Provider value={{
       chats, currentChatId, currentChat, messages, isLoading, createNewChat,
-      selectChat, deleteChat, sendMessage, updateChatTitle,
-      updateChatSystemPrompt, addFilesToCurrentChat, removeFileFromCurrentChat
+      selectChat, deleteChat, sendMessage,
+      addMessageToCurrentChat, // Beibehalten für Optimistic UI
+      updateChatTitle, updateChatSystemPrompt, addFilesToCurrentChat, removeFileFromCurrentChat
     }}>
       {children}
     </ChatsContext.Provider>
