@@ -27,45 +27,30 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Lädt die Chat-Liste vom Server
+  // Lädt die Chat-Liste für den eingeloggten Nutzer
   const fetchChats = useCallback(async () => {
-    if (!user) {
-      setChats([]);
-      setCurrentChatId(null);
-      return;
-    }
+    if (!user) { setChats([]); setCurrentChatId(null); return; }
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/chats`, {
-        headers: { 'ngrok-skip-browser-warning': 'true' },
-      });
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/chats`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
       if (response.ok) {
         const chatsData: any[] = await response.json();
-        // KORREKTUR: Robuste Umwandlung mit Standardwerten, um Abstürze zu verhindern
-        const formattedChats: Chat[] = chatsData.map(chat => ({
-          id: chat.id.toString(),
-          title: chat.title || 'Unbenannter Chat',
-          messages: [],
-          files: [],
-          createdAt: chat.created_at ? new Date(chat.created_at) : new Date(),
-          updatedAt: chat.updated_at ? new Date(chat.updated_at) : new Date(),
-          systemPrompt: chat.system_prompt || '',
-          preview: "Noch keine Nachrichten",
+        const formattedChats = chatsData.map(c => ({
+          ...c, id: c.id.toString(), createdAt: new Date(c.created_at), updatedAt: new Date(c.updated_at),
+          messages: [], files: [], preview: "Noch keine Nachrichten",
         }));
         setChats(formattedChats);
-
-        // Wähle einen Chat aus
+        
         const savedId = localStorage.getItem('chatbot-current-chat-id');
         if (savedId && formattedChats.some(c => c.id === savedId)) {
           setCurrentChatId(savedId);
         } else if (formattedChats.length > 0) {
           setCurrentChatId(formattedChats[0].id);
         } else {
-          // Wenn keine Chats existieren, erstelle einen
-          await createNewChat(true); // 'true' um zu verhindern, dass die Auswahl gesetzt wird
+            await createNewChat();
         }
       }
-    } catch (e) { console.error("Fehler beim Laden der Chats:", e); }
+    } catch (e) { console.error("Fehler beim Laden der Chats:", e); } 
     finally { setIsLoading(false); }
   }, [user]);
 
@@ -77,9 +62,8 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
         fetch(`${API_BASE_URL}/api/chats/${chatId}/messages`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
         fetch(`${API_BASE_URL}/api/chats/${chatId}/documents`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
       ]);
-      
-      const messagesData = msgRes.ok ? await msgRes.json() : [];
-      const documentsData = docRes.ok ? await docRes.json() : [];
+      const messagesData = await msgRes.json();
+      const documentsData = await docRes.json();
 
       const formattedMessages = messagesData.map((msg: any) => ({ ...msg, id: msg.id.toString(), sender: msg.role, timeStamp: new Date(msg.created_at) }));
       const formattedFiles = documentsData.map((doc: any) => ({ ...doc, id: doc.id.toString(), name: doc.filename, size: doc.filesize, type: doc.filename.split('.').pop() || 'unknown' }));
@@ -89,8 +73,8 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if(user) {
-      fetchChats();
+    if (user) {
+        fetchChats();
     }
   }, [user]);
 
@@ -103,24 +87,14 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
 
   const selectChat = (chatId: string) => setCurrentChatId(chatId);
 
-  const createNewChat = async (isInitial = false) => {
+  const createNewChat = async () => {
     if (!user) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/chats`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ title: 'Neuer Chat', user_id: parseInt(user.id) }),
       });
-      if(response.ok) {
-        const newChatData = await response.json();
-        const newChat: Chat = {
-          ...newChatData, id: newChatData.id.toString(), createdAt: new Date(newChatData.created_at), updatedAt: new Date(newChatData.updated_at),
-          messages: [], files: [], preview: 'Hallo! Ich bin Ihr KI-Assistent...',
-        };
-        setChats(prev => [newChat, ...prev]);
-        if (!isInitial) {
-            setCurrentChatId(newChat.id);
-        }
-      }
+      if(response.ok) await fetchChats();
     } catch (e) { console.error("Fehler beim Erstellen des Chats:", e); }
   };
   
@@ -135,7 +109,7 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
 
   const addMessageToCurrentChat = (message: Message) => {
     if (!currentChatId) return;
-    setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: [...c.messages, message] } : c));
+    setChats(prev => prev.map(chat => chat.id === currentChatId ? { ...chat, messages: [...chat.messages, message] } : c));
   };
   
   const sendMessage = async (messageContent: string) => {
@@ -151,7 +125,9 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error("Fehler beim Senden der Nachricht:", e);
       addMessageToCurrentChat({ id: `error-${Date.now()}`, content: "Fehler: Antwort konnte nicht empfangen werden.", sender: 'bot', timeStamp: new Date() });
-    } finally { setIsLoading(false); }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateChatTitle = async (chatId: string, title: string) => {
