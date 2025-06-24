@@ -38,7 +38,6 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
           messages: [], files: [], preview: "Noch keine Nachrichten",
         }));
         setChats(formattedChats);
-        
         const savedId = localStorage.getItem('chatbot-current-chat-id');
         if (savedId && formattedChats.some(c => c.id === savedId)) {
           setCurrentChatId(savedId);
@@ -52,11 +51,14 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const fetchChatDetails = useCallback(async (chatId: string) => {
+    if(!chatId) return;
     try {
       const [msgRes, docRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/chats/${chatId}/messages`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
         fetch(`${API_BASE_URL}/api/chats/${chatId}/documents`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
       ]);
+      if(!msgRes.ok || !docRes.ok) throw new Error("Fehler beim Abrufen der Chat-Details");
+      
       const messagesData = await msgRes.json();
       const documentsData = await docRes.json();
 
@@ -116,9 +118,7 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) {
       console.error("Fehler beim Senden der Nachricht:", e);
       addMessageToCurrentChat({ id: `error-${Date.now()}`, content: "Fehler: Antwort konnte nicht empfangen werden.", sender: 'bot', timeStamp: new Date() });
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
   const updateChatTitle = async (chatId: string, title: string) => {
