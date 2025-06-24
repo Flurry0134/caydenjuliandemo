@@ -20,14 +20,20 @@ interface ChatsContextType {
 }
 
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
-const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app';
+const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app'; // WICHTIG: Deine ngrok URL
 
-export const ChatsProvider = ({ children }: { children: ReactNode }) => {
+export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Helper to get current user from localStorage (used for API calls)
+  const getCurrentUser = useCallback(() => {
+    const savedUser = localStorage.getItem('chatbot-user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  }, []);
 
   const fetchChats = useCallback(async () => {
     if (!user) {
@@ -46,9 +52,9 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
           id: chat.id.toString(),
           createdAt: new Date(chat.created_at),
           updatedAt: new Date(chat.updated_at),
-          messages: [],
-          files: [],
-          preview: "Noch keine Nachrichten",
+          messages: [], // Nachrichten werden separat geladen
+          files: [],    // Dateien werden separat geladen
+          preview: chat.preview || "Noch keine Nachrichten", // Sicherstellen, dass preview existiert
         }));
         setChats(formattedChats);
         const savedId = localStorage.getItem('chatbot-current-chat-id');
@@ -56,10 +62,13 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
           setCurrentChatId(savedId);
         } else if (formattedChats.length > 0) {
           setCurrentChatId(formattedChats[0].id);
+        } else {
+          // Wenn keine Chats vorhanden sind, einen neuen erstellen
+          await createNewChat();
         }
       }
     } catch (e) { console.error("Fehler beim Laden der Chats:", e); }
-  }, [user]);
+  }, [user]); // createNewChat als Dependency hinzugefügt
 
   const fetchMessages = useCallback(async (chatId: string) => {
     try {
@@ -71,13 +80,40 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
         const formattedMessages = messagesData.map(msg => ({
           ...msg,
           id: msg.id.toString(),
-          sender: msg.role,
+          sender: msg.role, // 'sender' für Frontend-Kompatibilität
           timeStamp: new Date(msg.created_at)
         }));
         setMessages(formattedMessages);
       }
     } catch (e) { console.error("Fehler beim Laden der Nachrichten:", e); }
   }, []);
+
+  // NEUE FUNKTION: Dateien für den aktuellen Chat abrufen
+  const fetchDocuments = useCallback(async (chatId: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chats/${chatId}/documents`, {
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (response.ok) {
+        const documentsData: any[] = await response.json();
+        const formattedFiles: ChatFile[] = documentsData.map(doc => ({
+          id: doc.id.toString(),
+          name: doc.filename,
+          size: doc.filesize,
+          type: doc.filename.split('.').pop() || 'unknown' // Dateityp extrahieren
+        }));
+        // Aktualisiere den 'files'-Array im entsprechenden Chat-Objekt
+        setChats(prevChats =>
+          prevChats.map(chat =>
+            chat.id === chatId
+              ? { ...chat, files: formattedFiles }
+              : chat
+          )
+        );
+      }
+    } catch (e) { console.error("Fehler beim Laden der Dokumente:", e); }
+  }, []);
+
 
   useEffect(() => {
     fetchChats();
@@ -87,10 +123,13 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     if (currentChatId) {
       localStorage.setItem('chatbot-current-chat-id', currentChatId);
       fetchMessages(currentChatId);
+      fetchDocuments(currentChatId); // Dokumente laden, wenn Chat wechselt
     } else {
         setMessages([]);
+        // Wenn kein Chat ausgewählt ist, auch die Dateien leeren
+        setChats(prevChats => prevChats.map(chat => ({ ...chat, files: [] })));
     }
-  }, [currentChatId, fetchMessages]);
+  }, [currentChatId, fetchMessages, fetchDocuments]);
 
   const selectChat = (chatId: string) => setCurrentChatId(chatId);
 
@@ -132,30 +171,65 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
 
   const addMessageToCurrentChat = (message: Message) => {
       if(!currentChatId) return;
+      // Temporäre Nachricht für sofortige UI-Anzeige hinzufügen
       setMessages(prev => [...prev, message]);
+      // Optional: Hier könnte man auch den Chat-Titel aktualisieren, wenn es die erste Nachricht ist
+      // und die Vorschau aktualisieren. Das wird aber auch durch fetchMessages nach der API-Antwort synchronisiert.
   }
   
   const sendMessage = async (messageContent: string) => {
     if (!currentChatId) return;
     setIsLoading(true);
+    
+    // Temporäre User-Nachricht für sofortige UI-Anzeige hinzufügen
     addMessageToCurrentChat({ id: `temp-${Date.now()}`, content: messageContent, sender: 'user', timeStamp: new Date() });
     
     try {
-      await fetch(`${API_BASE_URL}/api/chat/completion`, {
+      // Zuerst die User-Nachricht im Backend speichern
+      const userMessageResponse = await fetch(`${API_BASE_URL}/api/chats/${currentChatId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ role: 'user', content: messageContent }),
+      });
+
+      if (!userMessageResponse.ok) {
+        throw new Error('Failed to save user message to backend');
+      }
+
+      // Dann die Completion vom LLM anfordern
+      const completionResponse = await fetch(`${API_BASE_URL}/api/chat/completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ chat_id: parseInt(currentChatId), message: messageContent }),
       });
+
+      if (!completionResponse.ok) {
+        throw new Error('Failed to get AI completion');
+      }
+
+      // Nach erfolgreicher Completion alle Nachrichten neu laden (inkl. KI-Antwort)
       await fetchMessages(currentChatId);
-    } catch (e) {
+
+      // Optional: Chat-Titel aktualisieren, falls es die erste Nachricht war
+      const currentChatData = chats.find(chat => chat.id === currentChatId);
+      if (currentChatData && currentChatData.title === 'Neuer Chat' && messageContent.length > 0) {
+        const newTitle = messageContent.length > 40
+          ? messageContent.substring(0, 40) + '...'
+          : messageContent;
+        await updateChatTitle(currentChatId, newTitle);
+      }
+
+    } catch (e: any) {
       console.error("Fehler beim Senden der Nachricht:", e);
-      addMessageToCurrentChat({ id: `error-${Date.now()}`, content: "Fehler: Antwort konnte nicht empfangen werden.", sender: 'bot', timeStamp: new Date() });
+      // Fehlermeldung für den Benutzer anzeigen
+      addMessageToCurrentChat({ id: `error-${Date.now()}`, content: `Fehler: ${e.message || "Antwort konnte nicht empfangen werden."}`, sender: 'bot', timeStamp: new Date() });
     } finally {
       setIsLoading(false);
     }
   };
 
   const updateChatTitle = async (chatId: string, title: string) => {
+    // Sofortige UI-Aktualisierung
     setChats(prev => prev.map(c => (c.id === chatId ? { ...c, title } : c)));
     try {
         await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
@@ -167,6 +241,7 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateChatSystemPrompt = async (chatId: string, systemPrompt: string) => {
+    // Sofortige UI-Aktualisierung
     setChats(prev => prev.map(c => c.id === chatId ? { ...c, systemPrompt } : c));
      try {
         await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
@@ -177,9 +252,58 @@ export const ChatsProvider = ({ children }: { children: ReactNode }) => {
     } catch (e) { console.error("Fehler beim Aktualisieren des System-Prompts:", e); }
   };
   
-  // Platzhalter - die API-Endpunkte dafür existieren bereits im Backend
-  const addFilesToCurrentChat = async (files: File[]) => { console.log('addFilesToCurrentChat', files); };
-  const removeFileFromCurrentChat = async (fileId: string) => { console.log('removeFileFromCurrentChat', fileId); };
+  // KORRIGIERTE FUNKTION: Dateien hochladen
+  const addFilesToCurrentChat = async (files: File[]) => {
+    if (!currentChatId) throw new Error('No chat selected to add files to.');
+
+    try {
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file); // 'file' muss dem Namen im FastAPI-Endpunkt entsprechen
+
+        const response = await fetch(`${API_BASE_URL}/api/chats/${currentChatId}/documents`, {
+          method: 'POST',
+          body: formData,
+          // 'Content-Type' wird bei FormData automatisch gesetzt (multipart/form-data)
+          headers: { 'ngrok-skip-browser-warning': 'true' },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `Failed to upload file: ${file.name}`);
+        }
+        console.log(`Datei ${file.name} erfolgreich hochgeladen.`);
+      }
+      // Nach erfolgreichem Upload alle Dokumente für den Chat neu laden
+      await fetchDocuments(currentChatId);
+    } catch (error) {
+      console.error('Fehler beim Hochladen der Dateien:', error);
+      throw error;
+    }
+  };
+
+  // KORRIGIERTE FUNKTION: Datei entfernen
+  const removeFileFromCurrentChat = async (fileId: string) => {
+    if (!currentChatId) return; // Sollte nicht passieren, wenn eine Datei ausgewählt ist
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${fileId}`, {
+        method: 'DELETE',
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+
+      if (response.ok) {
+        console.log(`Datei ${fileId} erfolgreich entfernt.`);
+        // Nach erfolgreichem Entfernen alle Dokumente für den Chat neu laden
+        await fetchDocuments(currentChatId);
+      } else {
+        console.error(`Fehler beim Entfernen der Datei ${fileId}:`, response.statusText);
+      }
+    } catch (error) {
+      console.error('Fehler beim Entfernen der Datei:', error);
+      throw error;
+    }
+  };
 
   const currentChat = chats.find(chat => chat.id === currentChatId) || null;
 
