@@ -20,7 +20,7 @@ interface ChatsContextType {
 }
 
 const ChatsContext = createContext<ChatsContextType | undefined>(undefined);
-const API_BASE_URL = 'https://ab01-78-42-249-25.ngrok-free.app'; // WICHTIG: Deine ngrok URL
+const API_BASE_URL = 'https://5b26bc388bc8.ngrok-free.app'; // WICHTIG: Deine ngrok URL
 
 export const ChatsProvider = ({ children }: { children: ReactNode } ) => {
   const { user } = useAuth();
